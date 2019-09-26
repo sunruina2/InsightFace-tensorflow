@@ -65,37 +65,43 @@ class Trainer:
         with open(os.path.join(self.output_dir, 'config.yaml'), 'w') as f:
             f.write(yaml.dump(self.config))
 
-
     def build(self):
         self.train_phase_dropout = tf.placeholder(dtype=tf.bool, shape=None, name='train_phase_dropout')
         self.train_phase_bn = tf.placeholder(dtype=tf.bool, shape=None, name='train_phase_bn')
         self.global_step = tf.Variable(name='global_step', initial_value=0, trainable=False)
         self.inc_op = tf.assign_add(self.global_step, 1, name='increment_global_step')
-        scale = int(512.0/self.batch_size)
-        lr_steps = [scale*s for s in self.config['lr_steps']]
-        lr_values = [v/scale for v in self.config['lr_values']]
+        scale = int(512.0 / self.batch_size)
+        lr_steps = [scale * s for s in self.config['lr_steps']]
+        lr_values = [v / scale for v in self.config['lr_values']]
         # lr_steps = self.config['lr_steps']
-        self.lr = tf.train.piecewise_constant(self.global_step, boundaries=lr_steps, values=lr_values, name='lr_schedule')
+        self.lr = tf.train.piecewise_constant(self.global_step, boundaries=lr_steps, values=lr_values,
+                                              name='lr_schedule')
 
-        cid = ClassificationImageData(img_size=self.image_size, augment_flag=self.config['augment_flag'], augment_margin=self.config['augment_margin'])
+        cid = ClassificationImageData(img_size=self.image_size, augment_flag=self.config['augment_flag'],
+                                      augment_margin=self.config['augment_margin'])
         train_dataset = cid.read_TFRecord(self.config['train_data']).shuffle(10000).repeat().batch(self.batch_size)
         train_iterator = train_dataset.make_one_shot_iterator()
         self.train_images, self.train_labels = train_iterator.get_next()
         self.train_images = tf.identity(self.train_images, 'input_images')
         self.train_labels = tf.identity(self.train_labels, 'labels')
         if self.gpu_num <= 1:
-            self.embds, self.logits, self.end_points = inference(self.train_images, self.train_labels, self.train_phase_dropout, self.train_phase_bn, self.config)
+            self.embds, self.logits, self.end_points = inference(self.train_images, self.train_labels,
+                                                                 self.train_phase_dropout, self.train_phase_bn,
+                                                                 self.config)
             self.embds = tf.identity(self.embds, 'embeddings')
             self.inference_loss = slim.losses.sparse_softmax_cross_entropy(logits=self.logits, labels=self.train_labels)
             self.wd_loss = tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
-            self.train_loss = self.inference_loss+self.wd_loss
+            self.train_loss = self.inference_loss + self.wd_loss
             pred = tf.arg_max(tf.nn.softmax(self.logits), dimension=-1, output_type=tf.int64)
             self.train_acc = tf.reduce_mean(tf.cast(tf.equal(pred, self.train_labels), tf.float32))
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
             vars_softmax = [v for v in tf.trainable_variables() if 'embd_extractor' not in v.name]
             with tf.control_dependencies(update_ops):
-                self.train_op = tf.train.MomentumOptimizer(learning_rate=self.lr, momentum=self.config['momentum']).minimize(self.train_loss)
-                self.train_op_softmax = tf.train.MomentumOptimizer(learning_rate=self.lr, momentum=self.config['momentum']).minimize(self.train_loss, var_list=vars_softmax)
+                self.train_op = tf.train.MomentumOptimizer(learning_rate=self.lr,
+                                                           momentum=self.config['momentum']).minimize(self.train_loss)
+                self.train_op_softmax = tf.train.MomentumOptimizer(learning_rate=self.lr,
+                                                                   momentum=self.config['momentum']).minimize(
+                    self.train_loss, var_list=vars_softmax)
         else:
             self.embds = []
             self.logits = []
@@ -114,10 +120,13 @@ class Trainer:
                 sub_train_labels = train_labels[i]
                 with tf.device('/gpu:%d' % i):
                     with tf.variable_scope(tf.get_variable_scope(), reuse=(i > 0)):
-                        embds, logits, end_points = inference(sub_train_images, sub_train_labels, self.train_phase_dropout, self.train_phase_bn, self.config)
-                        inference_loss = slim.losses.sparse_softmax_cross_entropy(logits=logits, labels=sub_train_labels)
+                        embds, logits, end_points = inference(sub_train_images, sub_train_labels,
+                                                              self.train_phase_dropout, self.train_phase_bn,
+                                                              self.config)
+                        inference_loss = slim.losses.sparse_softmax_cross_entropy(logits=logits,
+                                                                                  labels=sub_train_labels)
                         wd_loss = tf.add_n(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES))
-                        train_loss = inference_loss+wd_loss
+                        train_loss = inference_loss + wd_loss
                         pred.append(tf.arg_max(tf.nn.softmax(logits), dimension=-1, output_type=tf.int64))
                         vars_softmax = [v for v in tf.trainable_variables() if 'embd_extractor' not in v.name]
                         tower_grads.append(opt.compute_gradients(train_loss))
@@ -130,9 +139,9 @@ class Trainer:
                         self.train_loss.append(train_loss)
             self.embds = tf.concat(self.embds, axis=0)
             self.logits = tf.concat(self.logits, axis=0)
-            self.inference_loss = tf.add_n(self.inference_loss)/self.gpu_num
-            self.wd_loss = tf.add_n(self.wd_loss)/self.gpu_num
-            self.train_loss = tf.add_n(self.train_loss)/self.gpu_num
+            self.inference_loss = tf.add_n(self.inference_loss) / self.gpu_num
+            self.wd_loss = tf.add_n(self.wd_loss) / self.gpu_num
+            self.train_loss = tf.add_n(self.train_loss) / self.gpu_num
             pred = tf.concat(pred, axis=0)
             self.train_acc = tf.reduce_mean(tf.cast(tf.equal(pred, self.train_labels), tf.float32))
             train_ops = [opt.apply_gradients(average_gradients(tower_grads))]
@@ -142,7 +151,6 @@ class Trainer:
             self.train_op = tf.group(*train_ops)
             self.train_op_softmax = tf.group(*train_ops_softmax)
 
-
         self.train_summary = tf.summary.merge([
             tf.summary.scalar('inference_loss', self.inference_loss),
             tf.summary.scalar('wd_loss', self.wd_loss),
@@ -151,34 +159,36 @@ class Trainer:
         ])
 
     def run_embds(self, sess, images):
-        batch_num = len(images)//self.batch_size
-        left = len(images)%self.batch_size
+        batch_num = len(images) // self.batch_size
+        left = len(images) % self.batch_size
         embds = []
         for i in range(batch_num):
-            cur_embd = sess.run(self.embds, feed_dict={self.train_images: images[i*self.batch_size: (i+1)*self.batch_size], self.train_phase_dropout: False, self.train_phase_bn: self.val_bn_train})
+            cur_embd = sess.run(self.embds,
+                                feed_dict={self.train_images: images[i * self.batch_size: (i + 1) * self.batch_size],
+                                           self.train_phase_dropout: False, self.train_phase_bn: self.val_bn_train})
             embds += list(cur_embd)
         if left > 0:
             image_batch = np.zeros([self.batch_size, self.image_size, self.image_size, 3])
             image_batch[:left, :, :, :] = images[-left:]
-            cur_embd = sess.run(self.embds, feed_dict={self.train_images: image_batch, self.train_phase_dropout: False, self.train_phase_bn: self.val_bn_train})
+            cur_embd = sess.run(self.embds, feed_dict={self.train_images: image_batch, self.train_phase_dropout: False,
+                                                       self.train_phase_bn: self.val_bn_train})
             embds += list(cur_embd)[:left]
         return np.array(embds)
 
     def save_image_label(self, images, labels, step):
         save_dir = os.path.join(self.debug_dir, 'image_by_label')
         for i in range(len(labels)):
-            if(labels[i] < 10):
+            if (labels[i] < 10):
                 cur_save_dir = os.path.join(save_dir, str(labels[i]))
                 check_folders(cur_save_dir)
                 misc.imsave(os.path.join(cur_save_dir, '%d_%d.jpg' % (step, i)), images[i])
-
 
     def train(self):
         self.build()
         analyze_vars(tf.trainable_variables(), os.path.join(self.output_dir, 'model_vars.txt'))
         with open(os.path.join(self.output_dir, 'regularizers.txt'), 'w') as f:
             for v in tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES):
-                f.write(v.name+'\n')
+                f.write(v.name + '\n')
         # exit(-1)
         tf_config = tf.ConfigProto(allow_soft_placement=True)
         tf_config.gpu_options.allow_growth = True
@@ -200,10 +210,14 @@ class Trainer:
                 else:
                     cur_train_op = self.train_op
                 for j in range(self.step_per_epoch):
-                    _, l, l_wd, l_inf, acc, s, _ = sess.run([cur_train_op, self.train_loss, self.wd_loss, self.inference_loss, self.train_acc, self.train_summary, self.inc_op], feed_dict={self.train_phase_dropout: True, self.train_phase_bn: True})
+                    _, l, l_wd, l_inf, acc, s, _ = sess.run(
+                        [cur_train_op, self.train_loss, self.wd_loss, self.inference_loss, self.train_acc,
+                         self.train_summary, self.inc_op],
+                        feed_dict={self.train_phase_dropout: True, self.train_phase_bn: True})
                     counter += 1
-                    
-                    print("Epoch: [%2d/%2d] [%6d/%6d] time: %.2f, loss: %.3f (inference: %.3f, wd: %.3f), acc: %.3f" % (i, self.epoch_num, j, self.step_per_epoch, time.time() - start_time, l, l_inf, l_wd, acc))
+
+                    print("Epoch: [%2d/%2d] [%6d/%6d] time: %.2f, loss: %.3f (inference: %.3f, wd: %.3f), acc: %.3f" % (
+                    i, self.epoch_num, j, self.step_per_epoch, time.time() - start_time, l, l_inf, l_wd, acc))
                     start_time = time.time()
                     if counter % self.val_freq == 0:
                         saver_ckpt.save(sess, os.path.join(self.checkpoint_dir, 'ckpt-m'), global_step=counter)
@@ -214,21 +228,22 @@ class Trainer:
                                 imgs, imgs_f, issame = load_bin(v, self.image_size)
                                 embds = self.run_embds(sess, imgs)
                                 embds_f = self.run_embds(sess, imgs_f)
-                                embds = embds/np.linalg.norm(embds, axis=1, keepdims=True)+embds_f/np.linalg.norm(embds_f, axis=1, keepdims=True)
-                                tpr, fpr, acc_mean, acc_std, tar, tar_std, far = evaluate(embds, issame, far_target=1e-3, distance_metric=0)
-                                f.write('eval on %s: acc--%1.5f+-%1.5f, tar--%1.5f+-%1.5f@far=%1.5f\n' % (k, acc_mean, acc_std, tar, tar_std, far))
+                                embds = embds / np.linalg.norm(embds, axis=1, keepdims=True) + embds_f / np.linalg.norm(
+                                    embds_f, axis=1, keepdims=True)
+                                tpr, fpr, acc_mean, acc_std, tar, tar_std, far = evaluate(embds, issame,
+                                                                                          far_target=1e-3,
+                                                                                          distance_metric=0)
+                                f.write('eval on %s: acc--%1.5f+-%1.5f, tar--%1.5f+-%1.5f@far=%1.5f\n' % (
+                                k, acc_mean, acc_std, tar, tar_std, far))
                                 acc.append(acc_mean)
                             acc = np.mean(np.array(acc))
                             if acc > best_acc:
                                 saver_best.save(sess, os.path.join(self.model_dir, 'best-m'), global_step=counter)
                                 best_acc = acc
 
-                        
+
 if __name__ == '__main__':
     args = parse_args()
     config = yaml.load(open(args.config_path))
     trainer = Trainer(config)
     trainer.train()
-
-
-                    

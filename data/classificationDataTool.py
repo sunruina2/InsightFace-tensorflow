@@ -32,7 +32,6 @@ class ClassificationImageData:
         self.augment_flag = augment_flag
         self.augment_margin = augment_margin
 
-
     def get_path_label(self, root):
         ids = list(os.listdir(root))
         ids.sort()
@@ -44,22 +43,20 @@ class ClassificationImageData:
             cur_dir = os.path.join(root, i)
             fns = os.listdir(cur_dir)
             paths += [os.path.join(cur_dir, fn) for fn in fns]
-            labels += [id_dict[i]]*len(fns)
+            labels += [id_dict[i]] * len(fns)
         return paths, labels
-
 
     def image_processing(self, img):
         img.set_shape([None, None, 3])
         img = tf.image.resize_images(img, [self.img_size, self.img_size])
 
-        if self.augment_flag :
+        if self.augment_flag:
             augment_size = self.img_size + self.augment_margin
             img = augmentation(img, augment_size)
-        
+
         img = tf.cast(img, tf.float32) / 127.5 - 1
 
         return img
-
 
     def add_record(self, img, label, writer):
         img = to_rgb(img)
@@ -70,16 +67,15 @@ class ClassificationImageData:
             "shape": tf.train.Feature(int64_list=tf.train.Int64List(value=list(shape))),
             "label": tf.train.Feature(int64_list=tf.train.Int64List(value=[label]))
         })
-        tf_example = tf.train.Example(features = tf_features)
+        tf_example = tf.train.Example(features=tf_features)
         tf_serialized = tf_example.SerializeToString()
         writer.write(tf_serialized)
-    
-    
+
     def write_tfrecord_from_folders(self, read_dir, write_path):
         print('write tfrecord from folders...')
         writer = tf.python_io.TFRecordWriter(write_path, options=None)
         paths, labels = self.get_path_label(read_dir)
-        assert(len(paths) == len(labels))
+        assert (len(paths) == len(labels))
         total = len(paths)
         cnt = 0
         for p, l in zip(paths, labels):
@@ -90,7 +86,6 @@ class ClassificationImageData:
         writer.close()
         print('done![%d/%d]' % (cnt, total))
         print('class num: %d' % self.cat_num)
-
 
     def write_tfrecord_from_mxrec(self, read_dir, write_path):
         import mxnet as mx
@@ -120,7 +115,6 @@ class ClassificationImageData:
         print('done![%d/%d]' % (cnt, total))
         print('class num: %d' % self.cat_num)
 
-
     def parse_function(self, example_proto):
         dics = {
             'img': tf.FixedLenFeature(shape=(), dtype=tf.string),
@@ -132,8 +126,6 @@ class ClassificationImageData:
         parsed_example['img'] = tf.reshape(parsed_example['img'], parsed_example['shape'])
         return self.image_processing(parsed_example['img']), parsed_example['label']
 
-
     def read_TFRecord(self, filenames):
-        dataset = tf.data.TFRecordDataset(filenames, buffer_size=256<<20)
+        dataset = tf.data.TFRecordDataset(filenames, buffer_size=256 << 20)
         return dataset.map(self.parse_function, num_parallel_calls=8)
-

@@ -30,7 +30,7 @@ for i in imgidx:
     print(np.max(img))
     print(np.min(img))
     print('============================================')
-    misc.imsave(os.path.join(save_dir, str(cnt)+'.jpg'), img)
+    misc.imsave(os.path.join(save_dir, str(cnt) + '.jpg'), img)
     cnt += 1
     if cnt >= 100:
         break

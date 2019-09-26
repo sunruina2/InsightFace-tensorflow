@@ -9,20 +9,25 @@ def get_embd(inputs, is_training_dropout, is_training_bn, config, reuse=False, s
         net = inputs
         end_points = {}
         if config['backbone_type'].startswith('resnet_v2_m'):
-            arg_sc = modifiedResNet_v2.resnet_arg_scope(weight_decay=config['weight_decay'], batch_norm_decay=config['bn_decay'])
+            arg_sc = modifiedResNet_v2.resnet_arg_scope(weight_decay=config['weight_decay'],
+                                                        batch_norm_decay=config['bn_decay'])
             with slim.arg_scope(arg_sc):
                 if config['backbone_type'] == 'resnet_v2_m_50':
                     net, end_points = modifiedResNet_v2.resnet_v2_m_50(net, is_training=is_training_bn, return_raw=True)
                 elif config['backbone_type'] == 'resnet_v2_m_101':
-                    net, end_points = modifiedResNet_v2.resnet_v2_m_101(net, is_training=is_training_bn, return_raw=True)
+                    net, end_points = modifiedResNet_v2.resnet_v2_m_101(net, is_training=is_training_bn,
+                                                                        return_raw=True)
                 elif config['backbone_type'] == 'resnet_v2_m_152':
-                    net, end_points = modifiedResNet_v2.resnet_v2_m_152(net, is_training=is_training_bn, return_raw=True)
+                    net, end_points = modifiedResNet_v2.resnet_v2_m_152(net, is_training=is_training_bn,
+                                                                        return_raw=True)
                 elif config['backbone_type'] == 'resnet_v2_m_200':
-                    net, end_points = modifiedResNet_v2.resnet_v2_m_200(net, is_training=is_training_bn, return_raw=True)
+                    net, end_points = modifiedResNet_v2.resnet_v2_m_200(net, is_training=is_training_bn,
+                                                                        return_raw=True)
                 else:
                     raise ValueError('Invalid backbone type.')
         elif config['backbone_type'].startswith('resnet_v2'):
-            arg_sc = ResNet_v2.resnet_arg_scope(weight_decay=config['weight_decay'], batch_norm_decay=config['bn_decay'])
+            arg_sc = ResNet_v2.resnet_arg_scope(weight_decay=config['weight_decay'],
+                                                batch_norm_decay=config['bn_decay'])
             with slim.arg_scope(arg_sc):
                 if config['backbone_type'] == 'resnet_v2_50':
                     net, end_points = ResNet_v2.resnet_v2_50(net, is_training=is_training_bn, return_raw=True)
@@ -45,9 +50,5 @@ def get_embd(inputs, is_training_dropout, is_training_bn, config, reuse=False, s
                 end_points['embds'] = net
         else:
             raise ValueError('Invalid out type.')
-        
+
         return net, end_points
-
-
-        
-        

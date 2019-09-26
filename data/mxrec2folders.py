@@ -25,7 +25,7 @@ for i in imgidx:
     cur_save_dir = os.path.join(save_dir, str(l))
     if not os.path.exists(cur_save_dir):
         os.makedirs(cur_save_dir)
-    misc.imsave(os.path.join(cur_save_dir, str(cnt)+'.jpg'), img)
+    misc.imsave(os.path.join(cur_save_dir, str(cnt) + '.jpg'), img)
     cnt += 1
     print('%d/%d' % (cnt, total), end='\r')
     # if cnt >= 10:

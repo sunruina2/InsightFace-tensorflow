@@ -1,6 +1,6 @@
 import argparse
 
-from classificationDataTool import ClassificationImageData
+from data.classificationDataTool import ClassificationImageData
 
 
 def get_args():
@@ -22,4 +22,4 @@ if __name__ == "__main__":
     elif args.mode == 'mxrec':
         cid.write_tfrecord_from_mxrec(args.read_dir, args.save_path)
     else:
-        raise('ERROR: wrong mode (only folders and mxrec are supported)')
+        raise ('ERROR: wrong mode (only folders and mxrec are supported)')

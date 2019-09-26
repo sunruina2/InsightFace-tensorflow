@@ -84,7 +84,7 @@ def analyze_vars(variables, path):
         var_bytes = var_size * var.dtype.size
         total_size += var_size
         total_bytes += var_bytes
-        f.write(var.name+' '+tensor_description(var)+' '+'[%d, bytes: %d]\n' % (var_size, var_bytes))
+        f.write(var.name + ' ' + tensor_description(var) + ' ' + '[%d, bytes: %d]\n' % (var_size, var_bytes))
     f.write('Total size of variables: %d\n' % total_size)
     f.write('Total bytes of variables: %d\n' % total_bytes)
     return total_size, total_bytes
